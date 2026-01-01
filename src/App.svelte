@@ -1,341 +1,263 @@
 <script lang="ts">
-  import { onMount } from "svelte";
+  import { percent, fmt, counter, O } from "./lib/utils";
+  import { NoteManager, type Note } from "./lib";
   import Reader from "./Reader.svelte";
 
-  // --- Types ---
-  type Note = {
-    id: string;
-    text: string;
-    lastModified: number;
-    savedIndex: number;
-  };
-
-  // --- State ---
-  let notes: Note[] = [];
-  let activeNoteId: string | null = null;
+  const manager = new NoteManager();
+  let notes: Note[] = manager.getAll();
+  let activeId: string | null = notes[0]?.id || null;
   let isReading = false;
-  let globalWpm = 300; // Persist WPM across notes
+  let globalWpm = 500;
 
-  // --- Reactive Derived ---
-  $: activeNote = notes.find((n) => n.id === activeNoteId);
+  $: active = manager.get(activeId!);
+  $: sortedNotes = manager.getAll();
 
-  // Sort notes: Newest edited first
-  $: sortedNotes = [...notes].sort((a, b) => b.lastModified - a.lastModified);
-
-  // --- Persistence ---
-  onMount(() => {
-    const stored = localStorage.getItem("rsvp-notes");
-    if (stored) {
-      notes = JSON.parse(stored);
-    } else {
-      createNote("Welcome to RSVP Reader! Paste your text here.");
-    }
-
-    // Select the first note initially
-    if (notes.length > 0 && !activeNoteId) {
-      activeNoteId = notes[0].id;
-    }
-  });
-
-  function saveNotes() {
-    localStorage.setItem("rsvp-notes", JSON.stringify(notes));
-  }
-
-  // --- Actions ---
-  function createNote(initialText = "") {
-    const newNote: Note = {
-      id: crypto.randomUUID(),
-      text: initialText,
-      lastModified: Date.now(),
-      savedIndex: 0,
-    };
-    notes = [newNote, ...notes];
-    activeNoteId = newNote.id;
-    saveNotes();
-  }
-
-  function selectNote(id: string) {
-    activeNoteId = id;
+  function createNote() {
+    const note = manager.create("");
+    notes = manager.getAll();
+    activeId = note.id;
     isReading = false;
   }
 
-  function updateActiveNote(e: Event) {
-    if (!activeNote) return;
-    const val = (e.target as HTMLTextAreaElement).value;
-
-    // Update text and timestamp
-    notes = notes.map((n) =>
-      n.id === activeNoteId ? { ...n, text: val, lastModified: Date.now() } : n,
-    );
-    saveNotes();
+  function select(id: string) {
+    activeId = id;
+    isReading = false;
   }
 
-  function deleteNote(e: Event, id: string) {
+  function updateActive(e: Event) {
+    if (!active) return;
+    manager.update(active.id, (e.target as HTMLTextAreaElement).value);
+    notes = manager.getAll();
+  }
+
+  function del(e: Event, id: string) {
     e.stopPropagation();
     if (!confirm("Delete this note?")) return;
-
-    notes = notes.filter((n) => n.id !== id);
-    if (activeNoteId === id) {
-      activeNoteId = notes[0]?.id || null;
-    }
-    saveNotes();
+    manager.delete(id);
+    notes = manager.getAll();
+    activeId = notes[0]?.id || null;
+    isReading = false;
   }
 
-  // --- Reader Logic ---
-  function onReaderClose(e: CustomEvent) {
+  function onClose(e: CustomEvent) {
     isReading = false;
     const { index, wpm } = e.detail;
     globalWpm = wpm;
-
-    // Save progress
-    if (activeNote) {
-      notes = notes.map((n) =>
-        n.id === activeNoteId ? { ...n, savedIndex: index } : n,
-      );
-      saveNotes();
-    }
+    if (active) manager.setSavedIndex(active.id, index);
+    notes = manager.getAll();
   }
 
-  // Helpers
-  function getPreview(text: string) {
+  function preview(text: string) {
     return text.trim().split("\n")[0] || "New Note";
-  }
-
-  function formatDate(ts: number) {
-    return new Date(ts).toLocaleDateString(undefined, {
-      month: "short",
-      day: "numeric",
-    });
   }
 </script>
 
-<div class="app-container">
-  <aside class="sidebar">
-    <div class="sidebar-header">
-      <h2>Notes</h2>
-      <button class="add-btn" on:click={() => createNote()}>+</button>
-    </div>
+<main class="f">
+  <aside class="sidebar f-col">
+    <header class="f p20 j-bw al-ct">
+      <h2 class="m0">Vegapunk</h2>
+      <button class="add-btn rx20 f al-ct j-ct" on:click={() => createNote()}>
+        +
+      </button>
+    </header>
 
-    <div class="note-list">
+    <div class="list">
       {#each sortedNotes as note (note.id)}
         <div
-          class="note-item"
-          class:active={note.id === activeNoteId}
-          on:click={() => selectNote(note.id)}
+          class="item ptr f j-bw p20"
+          class:active={note.id === activeId}
+          on:click={() => select(note.id)}
         >
-          <div class="note-info">
-            <span class="note-title">{getPreview(note.text)}</span>
-            <span class="note-date">{formatDate(note.lastModified)}</span>
+          <div class="info f-col g5 w-100">
+            <span class="title fw6">{preview(note.text)}</span>
+            <div class="meta f j-bw al-ct">
+              <span class="date">{fmt(note.lastModified)}</span>
+              <span class="progress fw5">
+                {percent(note.text, note.savedIndex)}%
+              </span>
+            </div>
           </div>
-          <button class="delete-btn" on:click={(e) => deleteNote(e, note.id)}
-            >×</button
-          >
+          <button class="delete" on:click={(e) => del(e, note.id)}> × </button>
         </div>
       {/each}
     </div>
   </aside>
 
-  <main class="editor">
-    {#if activeNote}
-      <div class="toolbar">
-        <span class="status">
-          {#if activeNote.savedIndex > 0}
-            Resume at word {activeNote.savedIndex}
+  <main class="editor f-col">
+    {#if active}
+      <div class="toolbar f al-ct g20 j-bw">
+        <div>
+          {O(active.savedIndex)} / {O(counter(active.text))} words
+        </div>
+
+        <button
+          class="read f al-ct g5 fw6 rx5"
+          on:click={() => (isReading = true)}
+        >
+          {#if active.savedIndex > 0}
+            Resume at word {active.savedIndex}
           {:else}
             Start Reading
           {/if}
-        </span>
-        <button class="read-btn" on:click={() => (isReading = true)}>
-          ⚡ Speed Read
         </button>
       </div>
 
       <textarea
-        value={activeNote.text}
-        on:input={updateActiveNote}
+        value={active.text}
+        on:input={updateActive}
         placeholder="Type or paste your content here..."
       ></textarea>
     {:else}
-      <div class="empty-state">
-        <p>No note selected. Create one to begin.</p>
+      <div class="empty f al-ct j-ct h-100">
+        No note selected. Create one to begin.
       </div>
     {/if}
   </main>
-</div>
+</main>
 
-{#if isReading && activeNote}
+{#if isReading && active}
   <Reader
-    text={activeNote.text}
-    startIndex={activeNote.savedIndex}
+    text={active.text}
+    startIndex={active.savedIndex}
     wpm={globalWpm}
-    on:close={onReaderClose}
+    on:close={onClose}
   />
 {/if}
 
 <style>
   :global(body) {
-    margin: 0;
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
-      Helvetica, Arial, sans-serif;
-    background: #f5f5f5;
-    overflow: hidden; /* Prevent body scroll, handled by elements */
+    color: #e0e0e0;
+    overflow: hidden;
   }
 
-  .app-container {
-    display: flex;
+  main {
     height: 100vh;
     width: 100vw;
   }
 
-  /* Sidebar Styles */
   .sidebar {
+    border-right: 1px solid #333;
+    background: #222;
     width: 280px;
-    background: #fff;
-    border-right: 1px solid #ddd;
-    display: flex;
-    flex-direction: column;
     flex-shrink: 0;
   }
 
-  .sidebar-header {
-    padding: 1rem;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    border-bottom: 1px solid #eee;
-  }
-
-  .sidebar-header h2 {
-    margin: 0;
-    font-size: 1.2rem;
-    color: #333;
+  header {
+    border-bottom: 1px solid #333;
   }
 
   .add-btn {
-    background: #000;
+    border: 1px solid #444;
+    background: #222;
     color: #fff;
-    border: none;
     width: 30px;
     height: 30px;
-    border-radius: 50%;
-    cursor: pointer;
     font-size: 1.2rem;
-    display: flex;
-    align-items: center;
-    justify-content: center;
+
+    transition: background 0.2s;
   }
 
-  .note-list {
+  .add-btn:hover {
+    background: #444;
+  }
+
+  .list {
     flex: 1;
     overflow-y: auto;
   }
 
-  .note-item {
-    padding: 1rem;
-    border-bottom: 1px solid #f0f0f0;
-    cursor: pointer;
-    display: flex;
-    justify-content: space-between;
+  .item {
+    border-bottom: 1px solid #333;
     align-items: flex-start;
+
     transition: background 0.1s;
   }
 
-  .note-item:hover {
-    background: #fafafa;
-  }
-  .note-item.active {
-    background: #eef2ff;
-    border-left: 3px solid #000;
+  .item:hover {
+    background: #222;
   }
 
-  .note-info {
-    display: flex;
-    flex-direction: column;
-    gap: 0.3rem;
+  .item.active {
+    background: #333;
+    border-left: 3px solid #f44;
+  }
+
+  .info {
     overflow: hidden;
   }
 
-  .note-title {
-    font-weight: 600;
+  .title {
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
     max-width: 180px;
-    color: #333;
+    color: #eee;
   }
 
-  .note-date {
-    font-size: 0.8rem;
-    color: #888;
+  .meta {
+    font-size: 0.75rem;
+    padding-right: 10px;
   }
 
-  .delete-btn {
+  .date {
+    color: #777;
+  }
+
+  .progress {
+    color: #f44;
+  }
+
+  .delete {
     background: transparent;
     border: none;
-    color: #ccc;
+    color: #555;
     cursor: pointer;
     font-size: 1.2rem;
     padding: 0 5px;
   }
-  .delete-btn:hover {
-    color: #ff4444;
+
+  .delete:hover {
+    color: #f44;
   }
 
-  /* Editor Styles */
   .editor {
     flex: 1;
-    display: flex;
-    flex-direction: column;
-    background: #fff;
+    background: #222;
   }
 
   .toolbar {
+    border-bottom: 1px solid #333;
     padding: 1rem 2rem;
-    border-bottom: 1px solid #eee;
-    display: flex;
-    justify-content: flex-end;
-    align-items: center;
-    gap: 1rem;
   }
 
-  .status {
-    font-size: 0.9rem;
-    color: #666;
-  }
-
-  .read-btn {
-    background: #000;
+  .read {
+    background: #f44;
     color: #fff;
-    border: none;
     padding: 0.6rem 1.2rem;
-    border-radius: 6px;
-    font-weight: 600;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    gap: 5px;
+
+    transition: opacity 0.2s;
   }
-  .read-btn:hover {
+
+  .read:hover {
     opacity: 0.9;
   }
 
   textarea {
     flex: 1;
-    border: none;
     resize: none;
     padding: 2rem;
     font-size: 1.1rem;
     line-height: 1.6;
-    outline: none;
     font-family: inherit;
-    color: #333;
+    background: #222;
+    color: #eee;
   }
 
-  .empty-state {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    height: 100%;
-    color: #999;
+  textarea::placeholder {
+    color: #555;
+  }
+
+  .empty {
+    color: #555;
   }
 </style>

@@ -1,7 +1,7 @@
 <script lang="ts">
   import { createEventDispatcher, onDestroy, onMount } from "svelte";
-  import { processWord } from "./utils";
-  import Engine from "./player";
+  import { processWord } from "./lib/utils";
+  import Engine from "./lib/player";
 
   export let text: string = "";
   export let startIndex: number = 0;
@@ -97,18 +97,13 @@
 
 <style>
   .overlay {
-    position: fixed;
     top: 0;
     left: 0;
     width: 100vw;
     height: 100vh;
-    background-color: #1a1a1a;
+    background-color: #222;
     color: #eee;
     z-index: 9999;
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    align-items: center;
   }
 
   .reader-stage {
@@ -117,11 +112,6 @@
     width: 100%;
     background: #222;
     box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    border-radius: 10px;
-    position: relative;
   }
 
   .word-display {
@@ -131,7 +121,6 @@
     line-height: 1;
     white-space: nowrap;
     user-select: none;
-    display: flex;
   }
 
   .part.right,
@@ -139,31 +128,19 @@
     width: 300px;
     display: inline-block;
   }
-  .part.left {
-    text-align: right;
-  }
-  .part.right {
-    text-align: left;
-  }
 
   .part.pivot {
-    color: #ff4444;
+    color: #f44;
     width: auto;
     text-align: center;
     font-weight: 700;
   }
 
   .guide-lines {
-    position: absolute;
     top: 0;
     left: 50%;
     transform: translateX(-50%);
     width: 2px;
-    height: 100%;
-    display: flex;
-    flex-direction: column;
-    justify-content: space-between;
-    opacity: 0.33;
   }
 
   .notch-top,
@@ -174,28 +151,18 @@
   }
 
   .hud {
-    position: absolute;
     bottom: 0;
-    width: 100%;
-    padding: 20px;
     background: linear-gradient(to top, #000d, #0000);
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 10px;
   }
 
   .progress-bar {
-    height: 4px;
     background: #444;
-    width: 100%;
-    border-radius: 2px;
+    height: 4px;
   }
 
   .fill {
     background: #ff4444;
     transition: width 0.2s;
-    height: 100%;
   }
 
   .icon-btn {
