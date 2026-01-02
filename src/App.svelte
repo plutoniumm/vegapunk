@@ -15,58 +15,109 @@
   let notes: Note[] = [];
   let activeId: string | null = null;
   let active: Writable<Note | null> = writable(null);
-  $: sortedNotes = [];
 
-  onMount(() => {
-    manager = new NoteManager(frameText);
-    notes = manager.getAll();
-    activeId = notes[0]?.id || null;
-    active.set(manager.get(activeId!));
-    sortedNotes = manager.getAll();
+  $: sortedNotes = notes;
+
+  onMount(async () => {
+    manager = new NoteManager();
+    await manager.initialize(frameText);
+    await refreshList();
+
+    if (notes.length > 0) {
+      activeId = notes[0].id;
+      active.set(notes[0]);
+    }
   });
 
-  function createNote() {
-    const note = manager.create("");
-    notes = manager.getAll();
+  async function refreshList() {
+    notes = await manager.getAll();
+  }
+
+  async function createNote() {
+    const note = await manager.create("");
+    await refreshList();
+
     activeId = note.id;
     active.set(note);
     isReading = false;
   }
 
-  function select(id: string) {
+  async function select(id: string) {
     activeId = id;
-    active.set(manager.get(id));
+
+    const note = await manager.get(id);
+    active.set(note);
     isReading = false;
   }
 
   function updateActive(e: Event) {
-    let current: Note | null;
+    const text = (e.target as HTMLTextAreaElement).value;
+
+    active.update((n) =>
+      n
+        ? {
+            ...n,
+            text,
+            lastModified: Date.now(),
+          }
+        : null,
+    );
+
+    let current: Note | null = null;
     active.subscribe((v) => (current = v))();
+
     if (!current) return;
-    manager.update(current.id, (e.target as HTMLTextAreaElement).value);
-    notes = manager.getAll();
-    active.set(manager.get(current.id));
+
+    notes = notes
+      .map((n) =>
+        n.id === current!.id
+          ? {
+              ...n,
+              text,
+              lastModified: Date.now(),
+            }
+          : n,
+      )
+      .sort((a, b) => b.lastModified - a.lastModified);
+
+    manager.update(current.id, text);
   }
 
-  function del(e: Event, id: string) {
+  async function del(e: Event, id: string) {
     e.stopPropagation();
     if (!confirm("Delete this note?")) return;
-    manager.delete(id);
-    notes = manager.getAll();
-    activeId = notes[0]?.id || null;
-    active.set(manager.get(activeId!));
-    isReading = false;
+
+    await manager.delete(id);
+    await refreshList();
+
+    if (activeId === id) {
+      activeId = notes[0]?.id || null;
+      active.set(activeId ? await manager.get(activeId) : null);
+      isReading = false;
+    }
   }
 
-  function onClose(e: CustomEvent) {
+  async function onClose(e: CustomEvent) {
     isReading = false;
     const { index, wpm } = e.detail;
     globalWpm = wpm;
-    let current: Note | null;
+
+    let current: Note | null = null;
     active.subscribe((v) => (current = v))();
-    if (current) manager.setSavedIndex(current.id, index);
-    notes = manager.getAll();
-    active.set(manager.get(activeId!));
+
+    if (current) {
+      await manager.setSavedIndex(current.id, index);
+
+      active.update((n) =>
+        n
+          ? {
+              ...n,
+              savedIndex: index,
+            }
+          : null,
+      );
+      await refreshList();
+    }
   }
 
   function preview(text: string) {
@@ -78,29 +129,39 @@
   <aside class="sidebar f-col">
     <header class="f p20 j-bw al-ct">
       <h2 class="m0">Vegapunk</h2>
-      <button class="add-btn rx20 f al-ct j-ct" on:click={() => createNote()}>
+      <button class="add-btn rx20 f al-ct j-ct" on:click={createNote}>
         +
       </button>
     </header>
 
     <div class="list">
       {#each sortedNotes as note (note.id)}
+        <!-- svelte-ignore a11y_click_events_have_key_events -->
+        <!-- svelte-ignore a11y_no_static_element_interactions -->
         <div
-          class="item ptr f j-bw p20"
+          class="item ptr f j-bw p10"
           class:active={note.id === activeId}
           on:click={() => select(note.id)}
         >
           <div class="info f-col g5 w-100">
-            <span class="title fw6">{preview(note.text)}</span>
-            <div class="meta f j-bw al-ct">
+            <span class="title fw6 p5">{preview(note.text)}</span>
+
+            <div class="meta f j-bw p5 al-ct">
               <span class="date">{fmt(note.lastModified)}</span>
               <span class="progress fw5">
                 {percent(note.text, note.savedIndex)}%
               </span>
             </div>
           </div>
+
           <button class="delete" on:click={(e) => del(e, note.id)}> × </button>
         </div>
+        <progress
+          class="w-100 rx5 d-b"
+          value={percent(note.text, note.savedIndex)}
+          max={100}
+        >
+        </progress>
       {/each}
     </div>
   </aside>
@@ -175,7 +236,6 @@
     width: 30px;
     height: 30px;
     font-size: 1.2rem;
-
     transition: background 0.2s;
   }
 
@@ -191,7 +251,6 @@
   .item {
     border-bottom: 1px solid #333;
     align-items: flex-start;
-
     transition: background 0.1s;
   }
 
@@ -201,7 +260,7 @@
 
   .item.active {
     background: #333;
-    border-left: 3px solid #f44;
+    border-left: 3px solid var(--theme);
   }
 
   .info {
@@ -226,7 +285,18 @@
   }
 
   .progress {
-    color: #f44;
+    color: var(--theme);
+  }
+
+  progress {
+    height: 3px;
+  }
+  progress::-webkit-progress-bar {
+    background-color: #333;
+  }
+  progress::-webkit-progress-value {
+    background-color: var(--theme);
+    border-radius: 5px;
   }
 
   .delete {
@@ -239,7 +309,7 @@
   }
 
   .delete:hover {
-    color: #f44;
+    color: var(--theme);
   }
 
   .editor {
@@ -253,10 +323,9 @@
   }
 
   .read {
-    background: #f44;
+    background: var(--theme);
     color: #fff;
     padding: 0.6rem 1.2rem;
-
     transition: opacity 0.2s;
   }
 

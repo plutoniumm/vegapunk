@@ -36,16 +36,27 @@
       reader.toggle();
     }
 
+    let jump = 50;
+    if (e.shiftKey) jump = 500;
+
     if (e.code === "Escape") {
       handleClose();
     }
 
     if (e.code === "ArrowLeft") {
-      reader.seek(-10);
+      reader.seek(-20);
     }
 
     if (e.code === "ArrowRight") {
-      reader.seek(10);
+      reader.seek(20);
+    }
+
+    if (e.code === "ArrowUp") {
+      reader.setWpm(reader.wpm + jump);
+    }
+
+    if (e.code === "ArrowDown") {
+      reader.setWpm(reader.wpm - jump);
     }
   }
 
@@ -84,6 +95,7 @@
         type="range"
         min="100"
         max="1000"
+        step="50"
         value={reader.wpm}
         on:input={updateWpm}
         class="mini-slider"
@@ -130,7 +142,7 @@
   }
 
   .part.pivot {
-    color: #f44;
+    color: var(--theme);
     width: auto;
     text-align: center;
     font-weight: 700;

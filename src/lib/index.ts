@@ -6,56 +6,131 @@ export type Note = {
 };
 
 export class NoteManager {
-  private key = "rsvp-notes";
-  notes: Note[] = [];
+  private dbName = "rsvp-notes-db";
+  private storeName = "notes";
+  private version = 1;
+  private db: IDBDatabase | null = null;
 
-  constructor(frameText: string = "Welcome to RSVP Reader! Paste your text here.") {
-    const stored = localStorage.getItem(this.key);
-    this.notes = stored ? JSON.parse(stored) : [];
+  constructor() { }
 
-    if (!this.notes.length) this.create(frameText);
+  async initialize (frameText: string = "Welcome to RSVP Reader! Paste your text here."): Promise<void> {
+    this.db = await this.openDB();
+
+    const count = await this.count();
+    if (count === 0) {
+      await this.create(frameText);
+    }
   }
 
-  private save () {
-    localStorage.setItem(this.key, JSON.stringify(this.notes));
+  private openDB (): Promise<IDBDatabase> {
+    return new Promise((res, err) => {
+      const req = indexedDB.open(this.dbName, this.version);
+
+      req.onupgradeneeded = (event) => {
+        const db = (event.target as IDBOpenDBreq).result;
+        if (!db.objectStoreNames.contains(this.storeName)) {
+          db.createObjectStore(this.storeName, { keyPath: "id" });
+        }
+      };
+
+      req.onsuccess = () => res(req.result);
+      req.onerror = () => err(req.error);
+    });
   }
 
-  create (text = "") {
+  private getStore (mode: IDBTransactionMode): IDBObjectStore {
+    if (!this.db)
+      throw new Error("DB uninitialized. initialize() first.");
+
+    const tx = this.db.transaction(this.storeName, mode);
+    return tx.objectStore(this.storeName);
+  }
+
+  async create (text = ""): Promise<Note> {
     const note: Note = {
       id: crypto.randomUUID(),
       text,
       lastModified: Date.now(),
       savedIndex: 0,
     };
-    this.notes = [note, ...this.notes];
-    this.save();
 
-    return note;
+    return new Promise((res, err) => {
+      const store = this.getStore("readwrite");
+      const req = store.add(note);
+
+      req.onsuccess = () => res(note);
+      req.onerror = () => err(req.error);
+    });
   }
 
-  update (id: string, text: string, savedIndex?: number) {
-    this.notes = this.notes.map(n =>
-      n.id === id
-        ? { ...n, text, lastModified: Date.now(), savedIndex: savedIndex ?? n.savedIndex }
-        : n
-    );
-    this.save();
+  async update (id: string, text: string, savedIndex?: number): Promise<void> {
+    const note = await this.get(id);
+    if (!note) return;
+
+    const updatedNote: Note = {
+      ...note,
+      text,
+      lastModified: Date.now(),
+      savedIndex: savedIndex ?? note.savedIndex,
+    };
+
+    return new Promise((res, err) => {
+      const store = this.getStore("readwrite");
+      const req = store.put(updatedNote);
+
+      req.onsuccess = () => res();
+      req.onerror = () => err(req.error);
+    });
   }
 
-  delete (id: string) {
-    this.notes = this.notes.filter(n => n.id !== id);
-    this.save();
+  async delete (id: string): Promise<void> {
+    return new Promise((res, err) => {
+      const store = this.getStore("readwrite");
+      const req = store.delete(id);
+
+      req.onsuccess = () => res();
+      req.onerror = () => err(req.error);
+    });
   }
 
-  getAll () {
-    return [...this.notes].sort((a, b) => b.lastModified - a.lastModified);
+  async getAll (): Promise<Note[]> {
+    return new Promise((res, err) => {
+      const store = this.getStore("readonly");
+      const req = store.getAll();
+
+      req.onsuccess = () => {
+        const notes = req.result as Note[];
+        notes.sort((a, b) => b.lastModified - a.lastModified);
+        res(notes);
+      };
+      req.onerror = () => err(req.error);
+    });
   }
 
-  get (id: string) {
-    return this.notes.find(n => n.id === id) || null;
+  async get (id: string): Promise<Note | null> {
+    return new Promise((res, err) => {
+      const store = this.getStore("readonly");
+      const req = store.get(id);
+
+      req.onsuccess = () => res(req.result || null);
+      req.onerror = () => err(req.error);
+    });
   }
 
-  setSavedIndex (id: string, index: number) {
-    this.update(id, this.get(id)?.text || "", index);
+  async setSavedIndex (id: string, index: number): Promise<void> {
+    const note = await this.get(id);
+    if (note) {
+      await this.update(id, note.text, index);
+    }
+  }
+
+  private async count (): Promise<number> {
+    return new Promise((res, err) => {
+      const store = this.getStore("readonly");
+      const req = store.count();
+
+      req.onsuccess = () => res(req.result);
+      req.onerror = () => err(req.error);
+    });
   }
 }

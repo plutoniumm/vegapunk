@@ -21,7 +21,7 @@ export function processWord (word: string) {
   };
 }
 
-export function percent (text: string, index: number) {
+export function percent (text: string, index: number): number {
   if (!text) return 0;
   const wordCount = text
     .trim()
@@ -34,7 +34,7 @@ export function percent (text: string, index: number) {
   percent /= 10;
   percent = percent > 100 ? 100 : percent
 
-  return percent.toFixed(1);
+  return Number(percent.toFixed(1));
 }
 
 export function fmt (ts: number) {
