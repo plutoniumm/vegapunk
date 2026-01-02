@@ -7,6 +7,7 @@ let frameText = '';
 if (isFrame) {
   const urlParams = new URLSearchParams(window.location.search);
   let text = urlParams.get('text') || '';
+
   text = decodeURIComponent(text);
   frameText = text;
 }

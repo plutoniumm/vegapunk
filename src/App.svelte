@@ -7,6 +7,7 @@
   import { NoteManager, type Note } from "./lib";
 
   export let frameText = "";
+  console.log(frameText);
 
   let isReading = false;
   let globalWpm = 500;
@@ -18,7 +19,21 @@
 
   $: sortedNotes = notes;
 
+  let minimalMode = false;
+  let minimalNote: Note | null = null;
+
   onMount(async () => {
+    minimalMode = !!frameText;
+    if (minimalMode) {
+      minimalNote = {
+        id: "frame",
+        text: frameText,
+        lastModified: Date.now(),
+        savedIndex: 0,
+      };
+      active.set(minimalNote);
+      return;
+    }
     manager = new NoteManager();
     await manager.initialize(frameText);
     await refreshList();
@@ -34,6 +49,7 @@
   }
 
   async function createNote() {
+    if (minimalMode) return;
     const note = await manager.create("");
     await refreshList();
 
@@ -43,6 +59,7 @@
   }
 
   async function select(id: string) {
+    if (minimalMode) return;
     activeId = id;
 
     const note = await manager.get(id);
@@ -52,7 +69,15 @@
 
   function updateActive(e: Event) {
     const text = (e.target as HTMLTextAreaElement).value;
-
+    if (minimalMode) {
+      minimalNote = {
+        ...minimalNote!,
+        text,
+        lastModified: Date.now(),
+      };
+      active.set(minimalNote);
+      return;
+    }
     active.update((n) =>
       n
         ? {
@@ -84,6 +109,7 @@
   }
 
   async function del(e: Event, id: string) {
+    if (minimalMode) return;
     e.stopPropagation();
     if (!confirm("Delete this note?")) return;
 
@@ -105,6 +131,15 @@
     let current: Note | null = null;
     active.subscribe((v) => (current = v))();
 
+    if (minimalMode) {
+      minimalNote = {
+        ...minimalNote!,
+        savedIndex: index,
+      };
+      active.set(minimalNote);
+      return;
+    }
+
     if (current) {
       await manager.setSavedIndex(current.id, index);
 
@@ -125,50 +160,54 @@
   }
 </script>
 
-<main class="f">
-  <aside class="sidebar f-col">
-    <header class="f p20 j-bw al-ct">
-      <h2 class="m0">Vegapunk</h2>
-      <button class="add-btn rx20 f al-ct j-ct" on:click={createNote}>
-        +
-      </button>
-    </header>
+<main class="f {minimalMode ? 'minimal' : ''}">
+  {#if !minimalMode}
+    <aside class="sidebar f-col">
+      <header class="f p20 j-bw al-ct">
+        <h2 class="m0">Vegapunk</h2>
+        <button class="add-btn rx20 f al-ct j-ct" on:click={createNote}>
+          +
+        </button>
+      </header>
 
-    <div class="list">
-      {#each sortedNotes as note (note.id)}
-        <!-- svelte-ignore a11y_click_events_have_key_events -->
-        <!-- svelte-ignore a11y_no_static_element_interactions -->
-        <div
-          class="item ptr f j-bw p10"
-          class:active={note.id === activeId}
-          on:click={() => select(note.id)}
-        >
-          <div class="info f-col g5 w-100">
-            <span class="title fw6 p5">{preview(note.text)}</span>
+      <div class="list">
+        {#each sortedNotes as note (note.id)}
+          <!-- svelte-ignore a11y_click_events_have_key_events -->
+          <!-- svelte-ignore a11y_no_static_element_interactions -->
+          <div
+            class="item ptr f j-bw p10"
+            class:active={note.id === activeId}
+            on:click={() => select(note.id)}
+          >
+            <div class="info f-col g5 w-100">
+              <span class="title fw6 p5">{preview(note.text)}</span>
 
-            <div class="meta f j-bw p5 al-ct">
-              <span class="date">{fmt(note.lastModified)}</span>
-              <span class="progress fw5">
-                {percent(note.text, note.savedIndex)}%
-              </span>
+              <div class="meta f j-bw p5 al-ct">
+                <span class="date">{fmt(note.lastModified)}</span>
+                <span class="progress fw5">
+                  {percent(note.text, note.savedIndex)}%
+                </span>
+              </div>
             </div>
-          </div>
 
-          <button class="delete" on:click={(e) => del(e, note.id)}> × </button>
-        </div>
-        <progress
-          class="w-100 rx5 d-b"
-          value={percent(note.text, note.savedIndex)}
-          max={100}
-        >
-        </progress>
-      {/each}
-    </div>
-  </aside>
+            <button class="delete" on:click={(e) => del(e, note.id)}>
+              ×
+            </button>
+          </div>
+          <progress
+            class="w-100 rx5 d-b"
+            value={percent(note.text, note.savedIndex)}
+            max={100}
+          >
+          </progress>
+        {/each}
+      </div>
+    </aside>
+  {/if}
 
   <main class="editor f-col">
     {#if $active}
-      <div class="toolbar f al-ct g20 j-bw">
+      <div class="toolbar f al-ct g20 j-bw" class:minimal={minimalMode}>
         <div>
           {O($active?.savedIndex)} / {O(counter($active?.text))} words
         </div>
@@ -322,6 +361,11 @@
     padding: 1rem 2rem;
   }
 
+  .toolbar.minimal {
+    border-bottom: none;
+    padding: 1rem 2rem 0 2rem;
+  }
+
   .read {
     background: var(--theme);
     color: #fff;
@@ -350,5 +394,10 @@
 
   .empty {
     color: #555;
+  }
+
+  .minimal .sidebar,
+  .minimal header {
+    display: none !important;
   }
 </style>
