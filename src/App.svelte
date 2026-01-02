@@ -1,33 +1,51 @@
 <script lang="ts">
+  import { writable, type Writable } from "svelte/store";
+  import Reader from "./Reader.svelte";
+  import { onMount } from "svelte";
+
   import { percent, fmt, counter, O } from "./lib/utils";
   import { NoteManager, type Note } from "./lib";
-  import Reader from "./Reader.svelte";
 
-  const manager = new NoteManager();
-  let notes: Note[] = manager.getAll();
-  let activeId: string | null = notes[0]?.id || null;
+  export let frameText = "";
+
   let isReading = false;
   let globalWpm = 500;
 
-  $: active = manager.get(activeId!);
-  $: sortedNotes = manager.getAll();
+  let manager: NoteManager;
+  let notes: Note[] = [];
+  let activeId: string | null = null;
+  let active: Writable<Note | null> = writable(null);
+  $: sortedNotes = [];
+
+  onMount(() => {
+    manager = new NoteManager(frameText);
+    notes = manager.getAll();
+    activeId = notes[0]?.id || null;
+    active.set(manager.get(activeId!));
+    sortedNotes = manager.getAll();
+  });
 
   function createNote() {
     const note = manager.create("");
     notes = manager.getAll();
     activeId = note.id;
+    active.set(note);
     isReading = false;
   }
 
   function select(id: string) {
     activeId = id;
+    active.set(manager.get(id));
     isReading = false;
   }
 
   function updateActive(e: Event) {
-    if (!active) return;
-    manager.update(active.id, (e.target as HTMLTextAreaElement).value);
+    let current: Note | null;
+    active.subscribe((v) => (current = v))();
+    if (!current) return;
+    manager.update(current.id, (e.target as HTMLTextAreaElement).value);
     notes = manager.getAll();
+    active.set(manager.get(current.id));
   }
 
   function del(e: Event, id: string) {
@@ -36,6 +54,7 @@
     manager.delete(id);
     notes = manager.getAll();
     activeId = notes[0]?.id || null;
+    active.set(manager.get(activeId!));
     isReading = false;
   }
 
@@ -43,8 +62,11 @@
     isReading = false;
     const { index, wpm } = e.detail;
     globalWpm = wpm;
-    if (active) manager.setSavedIndex(active.id, index);
+    let current: Note | null;
+    active.subscribe((v) => (current = v))();
+    if (current) manager.setSavedIndex(current.id, index);
     notes = manager.getAll();
+    active.set(manager.get(activeId!));
   }
 
   function preview(text: string) {
@@ -84,18 +106,18 @@
   </aside>
 
   <main class="editor f-col">
-    {#if active}
+    {#if $active}
       <div class="toolbar f al-ct g20 j-bw">
         <div>
-          {O(active.savedIndex)} / {O(counter(active.text))} words
+          {O($active?.savedIndex)} / {O(counter($active?.text))} words
         </div>
 
         <button
           class="read f al-ct g5 fw6 rx5"
           on:click={() => (isReading = true)}
         >
-          {#if active.savedIndex > 0}
-            Resume at word {active.savedIndex}
+          {#if $active?.savedIndex > 0}
+            Resume at word {$active?.savedIndex}
           {:else}
             Start Reading
           {/if}
@@ -103,7 +125,7 @@
       </div>
 
       <textarea
-        value={active.text}
+        value={$active?.text}
         on:input={updateActive}
         placeholder="Type or paste your content here..."
       ></textarea>
@@ -115,10 +137,10 @@
   </main>
 </main>
 
-{#if isReading && active}
+{#if isReading && $active}
   <Reader
-    text={active.text}
-    startIndex={active.savedIndex}
+    text={$active?.text}
+    startIndex={$active?.savedIndex}
     wpm={globalWpm}
     on:close={onClose}
   />

@@ -9,10 +9,11 @@ export class NoteManager {
   private key = "rsvp-notes";
   notes: Note[] = [];
 
-  constructor() {
+  constructor(frameText: string = "Welcome to RSVP Reader! Paste your text here.") {
     const stored = localStorage.getItem(this.key);
     this.notes = stored ? JSON.parse(stored) : [];
-    if (!this.notes.length) this.create("Welcome to RSVP Reader! Paste your text here.");
+
+    if (!this.notes.length) this.create(frameText);
   }
 
   private save () {
@@ -28,6 +29,7 @@ export class NoteManager {
     };
     this.notes = [note, ...this.notes];
     this.save();
+
     return note;
   }
 

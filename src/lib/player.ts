@@ -45,7 +45,6 @@ export default class RSVP {
   public stop () {
     this.isPlaying = false;
     clearTimeout(this.timer);
-    this.idx = 0;
     this.update();
   }
 
