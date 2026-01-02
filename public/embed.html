@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Embedding Test</title>
+</head>
+
+<body>
+  <div>
+    Lorem ipsum dolor sit, amet consectetur adipisicing elit. Magnam sapiente quidem sequi. Suscipit illo quis
+    exercitationem optio fugit delectus? Qui nemo fugit doloribus praesentium repudiandae? Minus neque, assumenda
+    quisquam ab excepturi libero veritatis, asperiores ex architecto optio, numquam magnam. Labore.
+  </div>
+
+  <script>
+    setTimeout( () => {
+      javascript: ( function () {
+        const sel = window.getSelection().toString();
+        if ( !sel ) return;
+
+        const encoded = encodeURIComponent( sel );
+        if ( navigator.clipboard )
+          navigator.clipboard.writeText( encoded );
+
+        const data = JSON.stringify( { text: sel } );
+        const url = "https://punk.manav.ch/";
+
+        const iframe = document.createElement( "iframe" );
+        iframe.src = url;
+        iframe.name = data;
+        const style = {
+          position: "fixed",
+          top: "5vh",
+          left: "5vw",
+          width: "90vw",
+          height: "90vh",
+          border: "2px solid #fff",
+          borderRadius: "10px",
+          zIndex: "2147483647"
+        };
+
+        Object.assign( iframe.style, style );
+        document.body.appendChild( iframe );
+      } )();
+    }, 2_000 );
+  </script>
+</body>
+
+</html>

@@ -49,7 +49,6 @@ export default class RSVP {
   }
 
   public seek (delta: number) {
-    this.pause();
     const newIdx = this.idx + delta;
     this.idx = Math.max(0, Math.min(newIdx, this.words.length - 1));
 

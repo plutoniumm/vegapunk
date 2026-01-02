@@ -5,9 +5,7 @@ const isFrame = window.self !== window.top;
 
 let frameText = '';
 if (isFrame) {
-  const urlParams = new URLSearchParams(window.location.search);
-  let text = urlParams.get('text') || '';
-
+  let text = JSON.parse(window.name).text;
   text = decodeURIComponent(text);
   frameText = text;
 }

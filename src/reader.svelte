@@ -36,9 +36,6 @@
       reader.toggle();
     }
 
-    let jump = 50;
-    if (e.shiftKey) jump = 500;
-
     if (e.code === "Escape") {
       handleClose();
     }
@@ -52,11 +49,19 @@
     }
 
     if (e.code === "ArrowUp") {
-      reader.setWpm(reader.wpm + jump);
+      if (e.shiftKey) {
+        reader.setWpm(reader.wpm + 500);
+      } else {
+        reader.setWpm(reader.wpm + 50);
+      }
     }
 
     if (e.code === "ArrowDown") {
-      reader.setWpm(reader.wpm - jump);
+      if (e.shiftKey) {
+        reader.setWpm(reader.wpm - 500);
+      } else {
+        reader.setWpm(reader.wpm - 50);
+      }
     }
   }
 
@@ -66,10 +71,10 @@
 <svelte:window on:keydown={keydown} />
 
 <div class="overlay p-fix f-col j-ct al-ct">
-  <div class="reader-stage p-rel w-100 f j-ct al-ct rx10">
-    <div class="guide-lines h-100 p-abs f-col j-bw o-33">
-      <div class="notch-top"></div>
-      <div class="notch-bottom"></div>
+  <div class="reader p-rel w-100 f j-ct al-ct rx10">
+    <div class="guides h-100 p-abs f-col j-bw o-33">
+      <div class="top"></div>
+      <div class="bottom"></div>
     </div>
 
     <div class="word-display fw5 f">
@@ -118,12 +123,11 @@
     z-index: 9999;
   }
 
-  .reader-stage {
+  .reader {
     max-width: 800px;
     height: 200px;
     width: 100%;
     background: #222;
-    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
   }
 
   .word-display {
@@ -148,15 +152,15 @@
     font-weight: 700;
   }
 
-  .guide-lines {
+  .guides {
     top: 0;
     left: 50%;
     transform: translateX(-50%);
     width: 2px;
   }
 
-  .notch-top,
-  .notch-bottom {
+  .top,
+  .bottom {
     width: 2px;
     height: 20px;
     background: #fff;
