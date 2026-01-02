@@ -1,3 +1,28 @@
+:root {
+  --theme: #f44;
+}
+
+::-webkit-scrollbar {
+  display: unset;
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background-color: var(--theme);
+  border-radius: 999px;
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--theme) transparent;
+}
+
+
 .g5 {
   gap: 5px;
 }
