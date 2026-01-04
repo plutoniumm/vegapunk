@@ -5,9 +5,9 @@
 
   import { percent, fmt, counter, O } from "./lib/utils";
   import { NoteManager, type Note } from "./lib";
+  import { read } from "./lib/files";
 
   export let frameText = "";
-  console.log(frameText);
 
   let isReading = false;
   let globalWpm = 500;
@@ -44,13 +44,10 @@
     }
   });
 
-  async function refreshList() {
-    notes = await manager.getAll();
-  }
-
-  async function createNote() {
+  const refreshList = async () => (notes = await manager.getAll());
+  async function createNote(text = "") {
     if (minimalMode) return;
-    const note = await manager.create("");
+    const note = await manager.create(text);
     await refreshList();
 
     activeId = note.id;
@@ -158,6 +155,16 @@
   function preview(text: string) {
     return text.trim().split("\n")[0] || "New Note";
   }
+
+  async function extract(e: Event) {
+    if (minimalMode) return;
+    const input = e.target as HTMLInputElement;
+    const file = input.files[0];
+    if (!file) return;
+
+    const text = read(file).then((data) => createNote(data));
+    text.then(() => (input.value = ""));
+  }
 </script>
 
 <main class="f {minimalMode ? 'minimal' : ''}">
@@ -165,9 +172,28 @@
     <aside class="sidebar f-col">
       <header class="f p20 j-bw al-ct">
         <h2 class="m0">Vegapunk</h2>
-        <button class="add-btn rx20 f al-ct j-ct" on:click={createNote}>
-          +
-        </button>
+
+        <div class="add-btn rx5 f">
+          <button on:click={createNote}>
+            <svg viewBox="0 0 32 32">
+              <path
+                d="M27 15 L27 30 2 30 2 5 17 5 M30 6 L26 2 9 19 7 25 13 23 Z M22 6 L26 10 Z M9 19 L13 23 Z"
+              />
+            </svg>
+          </button>
+          <input
+            id="file-upload"
+            type="file"
+            class="d-n"
+            accept=".text/*,.md,.markdown,.txt,.epub"
+            on:change={extract}
+          />
+          <label for="file-upload" class="ptr">
+            <svg viewBox="-2 -2 40 40">
+              <path d="M6 2 L6 30 26 30 26 10 18 2 Z M18 2 L18 10 26 10" />
+            </svg>
+          </label>
+        </div>
       </header>
 
       <div class="list">
@@ -190,7 +216,7 @@
               </div>
             </div>
 
-            <button class="delete" on:click={(e) => del(e, note.id)}>
+            <button class="delete ptr" on:click={(e) => del(e, note.id)}>
               ×
             </button>
           </div>
@@ -217,9 +243,9 @@
           on:click={() => (isReading = true)}
         >
           {#if $active?.savedIndex > 0}
-            Resume at word {$active?.savedIndex}
+            Word {$active?.savedIndex} ▶
           {:else}
-            Start Reading
+            Start RSVP
           {/if}
         </button>
       </div>
@@ -246,15 +272,11 @@
   />
 {/if}
 
-<style>
-  :global(body) {
-    color: #e0e0e0;
-    overflow: hidden;
-  }
-
+<style lang="scss">
   main {
     height: 100vh;
     width: 100vw;
+    color: #eee;
   }
 
   .sidebar {
@@ -270,16 +292,32 @@
 
   .add-btn {
     border: 1px solid #444;
-    background: #222;
+    text-align: center;
     color: #fff;
-    width: 30px;
-    height: 30px;
-    font-size: 1.2rem;
-    transition: background 0.2s;
-  }
+    & label,
+    & button {
+      width: 30px;
+      height: 30px;
 
-  .add-btn:hover {
-    background: #444;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #fff;
+
+      transition: background 0.2s;
+      &:hover {
+        background: #444;
+      }
+    }
+
+    & svg {
+      height: 22px;
+      width: 22px;
+      fill: none;
+      stroke: #fff;
+      stroke-width: 2;
+    }
   }
 
   .list {
@@ -291,10 +329,9 @@
     border-bottom: 1px solid #333;
     align-items: flex-start;
     transition: background 0.1s;
-  }
-
-  .item:hover {
-    background: #222;
+    &:hover {
+      background: #222;
+    }
   }
 
   .item.active {
@@ -339,12 +376,7 @@
   }
 
   .delete {
-    background: transparent;
-    border: none;
     color: #555;
-    cursor: pointer;
-    font-size: 1.2rem;
-    padding: 0 5px;
   }
 
   .delete:hover {
@@ -371,10 +403,9 @@
     color: #fff;
     padding: 0.6rem 1.2rem;
     transition: opacity 0.2s;
-  }
-
-  .read:hover {
-    opacity: 0.9;
+    &:hover {
+      opacity: 0.9;
+    }
   }
 
   textarea {
