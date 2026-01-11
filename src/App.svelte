@@ -1,16 +1,17 @@
 <script lang="ts">
   import { writable, type Writable } from "svelte/store";
-  import Reader from "./Reader.svelte";
+  import Reader from "./components/reader.svelte";
+  import TTS from "./components/tts.svelte";
   import { onMount } from "svelte";
 
   import { percent, fmt, counter, O } from "./lib/utils";
   import { NoteManager, type Note } from "./lib";
-  import { read } from "./lib/files";
+  import { read, ETA } from "./lib/files";
 
   export let frameText = "";
 
-  let isReading = false;
-  let globalWpm = 500;
+  let mode: "none" | "reader" | "tts" = "none";
+  let globalWpm = 300;
 
   let manager: NoteManager;
   let notes: Note[] = [];
@@ -42,6 +43,7 @@
       activeId = notes[0].id;
       active.set(notes[0]);
     }
+    mode = "none";
   });
 
   const refreshList = async () => (notes = await manager.getAll());
@@ -52,7 +54,7 @@
 
     activeId = note.id;
     active.set(note);
-    isReading = false;
+    mode = "none";
   }
 
   async function select(id: string) {
@@ -61,7 +63,7 @@
 
     const note = await manager.get(id);
     active.set(note);
-    isReading = false;
+    mode = "none";
   }
 
   function updateActive(e: Event) {
@@ -116,12 +118,12 @@
     if (activeId === id) {
       activeId = notes[0]?.id || null;
       active.set(activeId ? await manager.get(activeId) : null);
-      isReading = false;
+      mode = "none";
     }
   }
 
   async function onClose(e: CustomEvent) {
-    isReading = false;
+    mode = "none";
     const { index, wpm } = e.detail;
     globalWpm = wpm;
 
@@ -235,19 +237,31 @@
     {#if $active}
       <div class="toolbar f al-ct g20 j-bw" class:minimal={minimalMode}>
         <div>
-          {O($active?.savedIndex)} / {O(counter($active?.text))} words
+          {O($active?.savedIndex)} / {O(counter($active?.text))} words ({ETA(
+            $active?.savedIndex,
+            counter($active?.text),
+          )})
         </div>
 
-        <button
-          class="read f al-ct g5 fw6 rx5"
-          on:click={() => (isReading = true)}
-        >
-          {#if $active?.savedIndex > 0}
-            Word {$active?.savedIndex} ▶
-          {:else}
-            Start RSVP
-          {/if}
-        </button>
+        <div class="f g10">
+          <button
+            class="read f al-ct g5 fw6 rx5"
+            on:click={() => (mode = "reader")}
+          >
+            {#if $active?.savedIndex > 0}
+              Word {$active?.savedIndex} ▶
+            {:else}
+              Start RSVP
+            {/if}
+          </button>
+
+          <button
+            class="read f al-ct g5 fw6 rx5"
+            on:click={() => (mode = "tts")}
+          >
+            Start TTS
+          </button>
+        </div>
       </div>
 
       <textarea
@@ -263,13 +277,17 @@
   </main>
 </main>
 
-{#if isReading && $active}
-  <Reader
-    text={$active?.text}
-    startIndex={$active?.savedIndex}
-    wpm={globalWpm}
-    on:close={onClose}
-  />
+{#if mode !== "none" && $active}
+  {#if mode === "reader"}
+    <Reader
+      text={$active?.text}
+      startIndex={$active?.savedIndex}
+      wpm={globalWpm}
+      on:close={onClose}
+    />
+  {:else if mode === "tts"}
+    <TTS data={$active?.text} />
+  {/if}
 {/if}
 
 <style lang="scss">

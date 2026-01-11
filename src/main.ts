@@ -1,10 +1,9 @@
 import App from './App.svelte';
 import { mount } from 'svelte';
 
-const isFrame = window.self !== window.top;
 
 let frameText = '';
-if (isFrame) {
+if (window.self !== window.top) {
   let text = JSON.parse(window.name).text;
   text = decodeURIComponent(text);
   frameText = text;

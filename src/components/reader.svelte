@@ -1,7 +1,7 @@
 <script lang="ts">
   import { createEventDispatcher, onDestroy, onMount } from "svelte";
-  import { processWord } from "./lib/utils";
-  import Engine from "./lib/player";
+  import { processWord } from "../lib/utils";
+  import Engine from "../lib/player";
 
   export let text: string = "";
   export let startIndex: number = 0;

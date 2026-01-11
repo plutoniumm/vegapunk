@@ -21,16 +21,3 @@
   scrollbar-width: thin;
   scrollbar-color: var(--theme) transparent;
 }
-
-
-.g5 {
-  gap: 5px;
-}
-
-.g10 {
-  gap: 10px;
-}
-
-.g20 {
-  gap: 20px;
-}

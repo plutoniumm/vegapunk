@@ -112,3 +112,18 @@ function extractText (xhtml: string): string {
 
   return s;
 }
+
+export function ETA (current, total) {
+  const remaining = total - current;
+  const wpm = 300;
+  const minutes = Math.ceil(remaining / wpm);
+
+  if (minutes <= 1) return "1 min read";
+  if (minutes > 60) {
+    const hours = Math.ceil(minutes / 60);
+
+    return hours + " hours read";
+  };
+
+  return minutes + " mins read";
+}
