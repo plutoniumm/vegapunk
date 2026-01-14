@@ -17,26 +17,22 @@
   <script>
     setTimeout( () => {
       javascript: ( function () {
-        const sel = window.getSelection().toString();
-        if ( !sel ) return;
+        const sel = document.body.innerHTML;
+        const data = encodeURIComponent( sel );
 
-        const encoded = encodeURIComponent( sel );
-        if ( navigator.clipboard )
-          navigator.clipboard.writeText( encoded );
-
-        const data = JSON.stringify( { text: sel } );
         const url = "https://punk.manav.ch/";
+        // const url = "http://localhost:3000/";
 
         const iframe = document.createElement( "iframe" );
         iframe.src = url;
         iframe.name = data;
         const style = {
           position: "fixed",
-          top: "5vh",
-          left: "5vw",
+          top: "4.9vh",
+          left: "4.9vw",
           width: "90vw",
           height: "90vh",
-          border: "2px solid #fff",
+          border: "2px solid #888",
           borderRadius: "10px",
           zIndex: "2147483647"
         };
@@ -44,7 +40,7 @@
         Object.assign( iframe.style, style );
         document.body.appendChild( iframe );
       } )();
-    }, 2_000 );
+    }, 100 );
   </script>
 </body>
 
